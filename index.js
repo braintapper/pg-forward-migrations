@@ -23,16 +23,16 @@ PgForwardMigration = (function() {
 
     // build the queue
     enqueue() {
-      var client, extensionFilter, klawSync, migrationPaths, scannedFiles, sql, that;
+      var client, klawSync, migrationFilter, migrationPaths, scannedFiles, sql, that;
       that = this;
       // populate file_migrations array
       klawSync = require('klaw-sync');
-      extensionFilter = function(item) {
-        return item.path.endsWith(".sql");
+      migrationFilter = function(item) {
+        return item.path.endsWith(".sql") && item.path.includes("__");
       };
       scannedFiles = klawSync(`${this.config.migrationPath}`, {
         nodir: true,
-        filter: extensionFilter
+        filter: migrationFilter
       }).sortBy(function(item) {
         return item.path;
       });
@@ -60,7 +60,7 @@ PgForwardMigration = (function() {
         });
       });
       // populate executed_migrations array from db
-      console.log("Checking for existing migrations");
+      console.log(chalk.gray("Checking for completed migrations"));
       that = this;
       client = new this.client(this.config.database);
       client.connect();
@@ -68,20 +68,25 @@ PgForwardMigration = (function() {
       return client.query(sql).then(function(result) {
         that.executed_migrations = result.rows;
         client.end();
-        console.log("Cleaning up executed migrations from queue...");
+        console.log(chalk.gray("Cleaning up executed migrations from queue..."));
         that.executed_migrations.forEach(function(executed_migration) {
           return that.queued_migrations.remove(function(file_migration) {
-            if (file_migration.version_tag === executed_migration.version_tag) {
-              console.log(`Removing executed migration from queue: ${executed_migration.version_tag}`);
+            if (file_migration.script_filename === executed_migration.script_filename) {
+              console.log(chalk.gray(`${executed_migration.script_filename} already executed. Skipping`));
             }
-            return file_migration.version_tag === executed_migration.version_tag;
+            return file_migration.script_filename === executed_migration.script_filename;
           });
         });
+        that.queued_migrations.forEach(function(queued_migration) {
+          return console.log(chalk.white(`${queued_migration.script_filename} is new and will be queued.`));
+        });
+        console.log(`${that.queued_migrations.length} migrations outstanding.`);
         return that.nextInQueue();
       }).catch(function(err) {
-        console.log("error");
+        console.log(chalk.red("Error while retrieving executed migrations"));
         console.log(err);
-        return client.end();
+        client.end();
+        return that.finish();
       });
     }
 
@@ -89,10 +94,9 @@ PgForwardMigration = (function() {
       var client, currentMigration, logSql, migrationSql, that;
       that = this;
       logSql = "insert into pg_migrations (version_tag,description,script_path,script_filename,script_md5, executed_by,executed_at,execution_duration, success) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) ";
-      if (this.queued_migrations.length > 1) {
+      if (this.queued_migrations.length > 0) {
         currentMigration = this.queued_migrations.shift();
         migrationSql = fs.readFileSync(currentMigration.script_path).toString();
-        console.info(`Migrating: ${currentMigration.script_filename}`);
         client = new this.client(this.config.database);
         client.connect();
         //console.log sql
@@ -102,24 +106,25 @@ PgForwardMigration = (function() {
           currentMigration.execution_duration = currentMigration.executed_at.millisecondsAgo();
           currentMigration.success = 1;
           that.completed_migrations.push(currentMigration);
+          console.info(chalk.green(`Migrating: ${currentMigration.script_filename}`));
           client.end();
           // log migration
           client = new that.client(that.config.database);
           client.connect();
           return client.query(logSql, Object.values(currentMigration)).then(function(result) {
-            console.info(`Logged migration ${currentMigration.version_tag}`);
+            //console.info "Logged migration #{currentMigration.version_tag}"
             client.end();
             return that.nextInQueue();
           }).catch(function(err) {
             if (err != null) {
-              console.error("Error trying to record migration into pg_migrations");
+              console.error(chalk.red("Error trying to record migration into pg_migrations"));
               console.error(err);
               client.end();
               return that.finish();
             }
           });
         }).catch(function(err) {
-          console.error(`Error trying to migrate ${currentMigration.script_filename}`);
+          console.error(chalk.red(`Error trying to migrate ${currentMigration.script_filename}`));
           console.error(err);
           client.end();
           return that.finish();
@@ -129,6 +134,7 @@ PgForwardMigration = (function() {
       }
     }
 
+    // Check the migrations table, create if it doesn't exist, then enqueue migrations
     start() {
       var client, migrationSql, that;
       that = this;
@@ -136,9 +142,8 @@ PgForwardMigration = (function() {
       client.connect();
       console.log(chalk.yellow("Check Migrations Table"));
       migrationSql = fs.readFileSync("./sql/migrations.sql").toString();
-      console.log(chalk.yellow("Ensuring that pg_migrations table exists."));
+      console.log(chalk.gray("Ensuring that pg_migrations table exists."));
       return client.query(migrationSql).then(function(result) {
-        console.log(chalk.green("...done!"));
         client.end();
         return that.enqueue();
       }).catch(function(err) {
@@ -154,7 +159,7 @@ PgForwardMigration = (function() {
     }
 
     finish() {
-      return console.log(chalk.green("Migrations execution completed."));
+      return console.log(chalk.white(`Task finished. ${this.completed_migrations.length} migrations were executed.`));
     }
 
   };

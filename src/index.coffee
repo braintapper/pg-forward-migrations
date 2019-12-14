@@ -31,10 +31,10 @@ class PgForwardMigration
 
     klawSync = require('klaw-sync')
 
-    extensionFilter = (item)->
-      item.path.endsWith(".sql")
+    migrationFilter = (item)->
+      item.path.endsWith(".sql") && item.path.includes("__")
 
-    scannedFiles = klawSync("#{@config.migrationPath}" , {nodir: true, filter: extensionFilter}).sortBy (item)->
+    scannedFiles = klawSync("#{@config.migrationPath}" , {nodir: true, filter: migrationFilter}).sortBy (item)->
       return item.path
 
     migrationPaths = scannedFiles.map (item)->
@@ -59,7 +59,7 @@ class PgForwardMigration
 
     # populate executed_migrations array from db
 
-    console.log "Checking for existing migrations"
+    console.log chalk.gray("Checking for completed migrations")
 
     that = @
     client = new @client(@config.database)
@@ -69,18 +69,27 @@ class PgForwardMigration
     .then (result) ->
       that.executed_migrations = result.rows
       client.end()
-      console.log "Cleaning up executed migrations from queue..."
+      console.log chalk.gray("Cleaning up executed migrations from queue...")
       that.executed_migrations.forEach (executed_migration)->
         that.queued_migrations.remove (file_migration)->
-          if (file_migration.version_tag == executed_migration.version_tag)
-            console.log "Removing executed migration from queue: #{executed_migration.version_tag}"
+          if (file_migration.script_filename == executed_migration.script_filename)
+            console.log chalk.gray("#{executed_migration.script_filename} already executed. Skipping")
+          return (file_migration.script_filename == executed_migration.script_filename)
 
-          return (file_migration.version_tag == executed_migration.version_tag)
+      that.queued_migrations.forEach (queued_migration)->
+        console.log chalk.white("#{queued_migration.script_filename} is new and will be queued.")
+
+
+
+      console.log "#{that.queued_migrations.length} migrations outstanding."
+
+
       that.nextInQueue()
     .catch (err)->
-      console.log "error"
+      console.log chalk.red("Error while retrieving executed migrations")
       console.log err
       client.end()
+      that.finish()
 
 
 
@@ -89,17 +98,16 @@ class PgForwardMigration
 
     that = @
 
-
     logSql = "insert into pg_migrations (version_tag,description,script_path,script_filename,script_md5, executed_by,executed_at,execution_duration, success) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) "
 
-    if @queued_migrations.length > 1
+    if @queued_migrations.length > 0
 
       currentMigration = @queued_migrations.shift()
 
       migrationSql = fs.readFileSync(currentMigration.script_path).toString()
 
 
-      console.info "Migrating: #{currentMigration.script_filename}"
+
 
 
 
@@ -114,6 +122,7 @@ class PgForwardMigration
         currentMigration.execution_duration = currentMigration.executed_at.millisecondsAgo()
         currentMigration.success = 1
         that.completed_migrations.push currentMigration
+        console.info chalk.green("Migrating: #{currentMigration.script_filename}")
         client.end()
 
 
@@ -123,20 +132,19 @@ class PgForwardMigration
         client.connect()
         client.query logSql, Object.values(currentMigration)
         .then (result) ->
-          console.info "Logged migration #{currentMigration.version_tag}"
-
+          #console.info "Logged migration #{currentMigration.version_tag}"
           client.end()
           that.nextInQueue()
         .catch (err)->
           if err?
-            console.error "Error trying to record migration into pg_migrations"
+            console.error chalk.red("Error trying to record migration into pg_migrations")
             console.error err
             client.end()
             that.finish()
 
 
       .catch (err)->
-        console.error "Error trying to migrate #{currentMigration.script_filename}"
+        console.error chalk.red("Error trying to migrate #{currentMigration.script_filename}")
         console.error err
         client.end()
         that.finish()
@@ -150,19 +158,16 @@ class PgForwardMigration
 
 
 
-
+  # Check the migrations table, create if it doesn't exist, then enqueue migrations
   start: ()->
     that = @
     client = new @client(@config.database)
     client.connect()
     console.log chalk.yellow("Check Migrations Table")
     migrationSql = fs.readFileSync("./sql/migrations.sql").toString()
-    console.log chalk.yellow("Ensuring that pg_migrations table exists.")
+    console.log chalk.gray("Ensuring that pg_migrations table exists.")
     client.query(migrationSql)
     .then (result) ->
-
-
-      console.log chalk.green("...done!")
       client.end()
       that.enqueue()
     .catch (err)->
@@ -185,7 +190,8 @@ class PgForwardMigration
 
 
   finish: ()->
-    console.log chalk.green("Migrations execution completed.")
+
+    console.log chalk.white("Task finished. #{@completed_migrations.length} migrations were executed.")
 
 
 
