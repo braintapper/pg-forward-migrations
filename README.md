@@ -70,6 +70,8 @@ The second part is a descriptor for the SQL script. You can format this any way 
 The third part is .sql file extension. This migration tool only works with .sql files. All other file types are ignored.
 
 
+
+
 # Frequently Asked Questions
 
 ## Why not use something like Flyway instead?

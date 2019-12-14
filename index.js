@@ -141,7 +141,7 @@ PgForwardMigration = (function() {
       client = new this.client(this.config.database);
       client.connect();
       console.log(chalk.gray("Check Migrations Table"));
-      migrationSql = fs.readFileSync("./sql/migrations.sql").toString();
+      migrationSql = "CREATE TABLE IF NOT EXISTS pg_migrations\n(\n  id bigserial,\n  version_tag character varying(10) not null,\n  description character varying(256) not null,\n  script_path character varying(1024) not null,\n  script_filename character varying(256) not null,\n  script_md5 varchar(256) not null,\n  executed_by character varying(100) not null,\n  executed_at timestamp without time zone NOT NULL DEFAULT now(),\n  execution_duration integer not null,\n  success smallint not null,\n  CONSTRAINT pg_migrations_pkey PRIMARY KEY (id)\n);\n";
       console.log(chalk.gray("Ensuring that pg_migrations table exists."));
       return client.query(migrationSql).then(function(result) {
         client.end();
