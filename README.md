@@ -12,16 +12,60 @@ A rudimentary forward-only database migration tool for NodeJS and Postgresql.
   * The path to the folder containing your migration files (no subfolders are checked)
   * Your PG database connection information
 
+## To install
+
+```
+npm install pg-forward-migrations
+```
+
+## How To Use
+
+Example:
+
+```
+
+var PgForwardMigration, config, migrationJob;
+
+PgForwardMigration = require("pg-forward-migrations");
+
+config = {
+  "migrationPath": "./testmigrations", // folder containing migration files
+  "database": {
+    "host": "192.168.1.10",
+    "database": "migration_test",
+    "user": "demo",
+    "password": "demo",
+    "port": 5432
+  }
+};
+
+migrationJob = new PgForwardMigration(config);
+
+migrationJob.migrate();
+
+```
+
+
+In the migrations folder:
+
+```
+./testmigrations/..
+0001__Create_some_schemas.sql
+0002__Create_a_table.sql
+0003__Create_a_view.sql
+0004__Create_something_else.sql
+```
+
 
 ## Naming Convention for SQL Files
 
 0001__Description_Here.sql
 
-The first part "0001" is the version tag. This can be up to 10 characters, ideally a zero padded number. Migration files are loaded in ascending order. Sorting may be unpredictable if you don't stick to a zero padded number. Each file should be a consecutive number, with no gaps.
+The first part "0001" is the version tag. This part can be up to 10 characters, ideally a zero padded number. Migration files are loaded in ascending order. Sorting may be unpredictable if you don't stick to a zero padded number. Each file should be a consecutive number, with no gaps.
 
 The version tag must be followed by EXACTLY TWO underscores `__`.
 
-The second part is a descriptor for the SQL script. You can format this any way you want, as long as the characters are legal in a filename. When logging the file to the migration table, the descriptor will be "spacified" (i.e., camelcase, underscores, and hyphens are change spaces.).
+The second part is a descriptor for the SQL script. You can format this any way you want, as long as the characters are legal in a filename.
 
 The third part is .sql file extension. This migration tool only works with .sql files. All other file types are ignored.
 
