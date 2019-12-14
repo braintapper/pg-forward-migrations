@@ -5,6 +5,7 @@ Sugar.extend()
 path = require "path"
 hasha = require "hasha"
 fs = require "fs-extra"
+chalk = require "chalk"
 
 
 class PgForwardMigration
@@ -85,23 +86,20 @@ class PgForwardMigration
 
 
   nextInQueue: (rootScope)->
-    #rootScope = rootScope || @
-    #console.log "next in queue @"
-    #console.log @
-    # recurse through the migration queue
+
     that = @
 
 
     logSql = "insert into pg_migrations (version_tag,description,script_path,script_filename,script_md5, executed_by,executed_at,execution_duration, success) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) "
 
     if @queued_migrations.length > 1
-      console.log "nextInQueue"
+
       currentMigration = @queued_migrations.shift()
 
       migrationSql = fs.readFileSync(currentMigration.script_path).toString()
 
 
-      console.log "migrate this: #{currentMigration.version_tag}"
+      console.info "Migrating: #{currentMigration.script_filename}"
 
 
 
@@ -125,21 +123,21 @@ class PgForwardMigration
         client.connect()
         client.query logSql, Object.values(currentMigration)
         .then (result) ->
-          console.log "Logged migration #{currentMigration.version_tag}"
+          console.info "Logged migration #{currentMigration.version_tag}"
 
           client.end()
           that.nextInQueue()
         .catch (err)->
           if err?
-            console.log "logMigration error"
-            console.log err
+            console.error "Error trying to record migration into pg_migrations"
+            console.error err
             client.end()
             that.finish()
 
 
       .catch (err)->
-        console.log "error"
-        console.log err
+        console.error "Error trying to migrate #{currentMigration.script_filename}"
+        console.error err
         client.end()
         that.finish()
 
@@ -157,18 +155,18 @@ class PgForwardMigration
     that = @
     client = new @client(@config.database)
     client.connect()
-    console.log "Check Migrations Table"
+    console.log chalk.yellow("Check Migrations Table")
     migrationSql = fs.readFileSync("./sql/migrations.sql").toString()
-
+    console.log chalk.yellow("Ensuring that pg_migrations table exists.")
     client.query(migrationSql)
     .then (result) ->
-      console.log "Ensuring pg_migrations"
 
-      console.log result
+
+      console.log chalk.green("...done!")
       client.end()
       that.enqueue()
     .catch (err)->
-      console.log "error"
+      console.log chalk.red("Error trying to check the pg_migrations table exists")
       console.log err
       client.end()
       that.finish()
@@ -187,27 +185,9 @@ class PgForwardMigration
 
 
   finish: ()->
-    console.log "done!"
+    console.log chalk.green("Migrations execution completed.")
 
 
-
-
-
-  executeScript: (sql, next)->
-    that = @
-    client = new @client(@config.database)
-    client.connect()
-    #console.log sql
-    client.query(sql)
-    .then (result) ->
-      client.end()
-      if next?
-
-        next(result)
-    .catch (err)->
-      console.log "error"
-      console.log err
-      client.end()
 
 
 

@@ -1,12 +1,8 @@
-migrate = require("../index.js")
+PgForwardMigrations = require("../index.js")
 fs = require("fs-extra")
 
-console.log "test"
-
 config = fs.readJsonSync "./testconfig.json"
-console.log config
 
-migrationJob = new migrate(config)
-#migrationJob.enumerateScripts()
-console.log migrationJob.migrations
+migrationJob = new PgForwardMigrations(config)
+
 migrationJob.migrate()
