@@ -1,6 +1,6 @@
 {
   "name": "pg-forward-migrations",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A rudimentary forward-only database migration tool for NodeJS and Postgresql",
   "main": "index.js",
   "scripts": {
