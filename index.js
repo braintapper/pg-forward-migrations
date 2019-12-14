@@ -140,7 +140,7 @@ PgForwardMigration = (function() {
       that = this;
       client = new this.client(this.config.database);
       client.connect();
-      console.log(chalk.yellow("Check Migrations Table"));
+      console.log(chalk.gray("Check Migrations Table"));
       migrationSql = fs.readFileSync("./sql/migrations.sql").toString();
       console.log(chalk.gray("Ensuring that pg_migrations table exists."));
       return client.query(migrationSql).then(function(result) {
@@ -155,6 +155,7 @@ PgForwardMigration = (function() {
     }
 
     migrate() {
+      console.log(chalk.white("PG Forward Migrations"));
       return this.start();
     }
 

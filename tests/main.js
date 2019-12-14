@@ -1,11 +1,11 @@
-var PgForwardMigrations, config, fs, migrationJob;
+var PgForwardMigration, config, fs, migrationJob;
 
-PgForwardMigrations = require("../index.js");
+PgForwardMigration = require("../index.js");
 
 fs = require("fs-extra");
 
 config = fs.readJsonSync("./testconfig.json");
 
-migrationJob = new PgForwardMigrations(config);
+migrationJob = new PgForwardMigration(config);
 
 migrationJob.migrate();

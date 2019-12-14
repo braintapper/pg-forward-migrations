@@ -163,7 +163,7 @@ class PgForwardMigration
     that = @
     client = new @client(@config.database)
     client.connect()
-    console.log chalk.yellow("Check Migrations Table")
+    console.log chalk.gray("Check Migrations Table")
     migrationSql = fs.readFileSync("./sql/migrations.sql").toString()
     console.log chalk.gray("Ensuring that pg_migrations table exists.")
     client.query(migrationSql)
@@ -176,25 +176,12 @@ class PgForwardMigration
       client.end()
       that.finish()
 
-
-
-
-
   migrate: ()->
+    console.log chalk.white("PG Forward Migrations")
     @start()
 
-
-
-
-
-
-
   finish: ()->
-
     console.log chalk.white("Task finished. #{@completed_migrations.length} migrations were executed.")
-
-
-
 
 
 
