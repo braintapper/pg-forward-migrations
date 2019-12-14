@@ -1,0 +1,10 @@
+{
+  "migrationPath": "./testmigrations",
+  "database": {
+    "host": "192.168.1.10",
+    "database": "migration_test",
+    "user": "demo",
+    "password": "demo",
+    "port": 5432
+  }
+}

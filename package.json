@@ -1,0 +1,39 @@
+{
+  "name": "pg-forward-migrations",
+  "version": "0.0.1",
+  "description": "A rudimentary forward-only database migration tool for NodeJS and Postgresql",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/braintapper/pg-forward-migrations.git"
+  },
+  "keywords": [
+    "nodejs",
+    "postgresql",
+    "pg",
+    "forward",
+    "database",
+    "migration"
+  ],
+  "author": "Steven Ng",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/braintapper/pg-forward-migrations/issues"
+  },
+  "homepage": "https://github.com/braintapper/pg-forward-migrations#readme",
+  "dependencies": {
+    "chalk": "^3.0.0",
+    "fs-extra": "^8.1.0",
+    "hasha": "^5.1.0",
+    "klaw-sync": "^6.0.0",
+    "pg": "^7.13.0",
+    "sugar": "^2.0.6"
+  },
+  "devDependencies": {
+    "gulp": "^4.0.2",
+    "gulp-coffee": "^3.0.3"
+  }
+}
