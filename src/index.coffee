@@ -1,5 +1,3 @@
-
-
 Sugar = require "sugar"
 Sugar.extend()
 path = require "path"
