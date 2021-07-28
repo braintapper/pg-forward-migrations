@@ -17,7 +17,7 @@ class PgForwardMigration
 
   constructor: (config)->
     pg = require('pg')
-    @client = pg.Client
+    @client = new pg.Pool(config.database)
     @config = config
 
   # build the queue
@@ -59,14 +59,14 @@ class PgForwardMigration
 
     console.log chalk.gray("Checking for completed migrations")
 
-    that = @
-    client = new @client(@config.database)
-    client.connect()
+
+    
     sql = "select * from pg_migrations order by id asc"
-    client.query(sql)
-    .then (result) ->
+    try
+      result = await @client.query(sql)
+    
       that.executed_migrations = result.rows
-      client.end()
+      
       console.log chalk.gray("Cleaning up executed migrations from queue...")
       that.executed_migrations.forEach (executed_migration)->
         that.queued_migrations.remove (file_migration)->
@@ -83,10 +83,9 @@ class PgForwardMigration
 
 
       that.nextInQueue()
-    .catch (err)->
+    catch err
       console.log chalk.red("Error while retrieving executed migrations")
       console.log err
-      client.end()
       that.finish()
 
 
@@ -104,50 +103,35 @@ class PgForwardMigration
 
       migrationSql = fs.readFileSync(currentMigration.script_path).toString()
 
-
-
-
-
-
-      client = new @client(@config.database)
-      client.connect()
-      #console.log sql
-
       currentMigration.executed_at = Date.create()
-      client.query(migrationSql)
-      .then (result) ->
-        # migration completed
+      try 
+        result = await @client.query(migrationSql)
         currentMigration.execution_duration = currentMigration.executed_at.millisecondsAgo()
         currentMigration.success = 1
         that.completed_migrations.push currentMigration
         console.info chalk.green("Migrating: #{currentMigration.script_filename}")
-        client.end()
 
 
         # log migration
 
-        client = new that.client(that.config.database)
-        client.connect()
-        client.query logSql, Object.values(currentMigration)
-        .then (result) ->
-          #console.info "Logged migration #{currentMigration.version_tag}"
-          client.end()
+        
+        try
+          result = await @client.query logSql, Object.values(currentMigration)
           that.nextInQueue()
-        .catch (err)->
-          if err?
-            console.error chalk.red("Error trying to record migration into pg_migrations")
-            console.error err
-            client.end()
-            that.finish()
+        catch innerErr
+          console.error chalk.red("Error trying to record migration into pg_migrations")
+          console.error innerErr
+          that.finish()
 
 
-      .catch (err)->
+      catch err
         console.error chalk.red("Error trying to migrate #{currentMigration.script_filename}")
+        console.log "-".repeat(120)
+        console.error "Trace:"
         console.error err
-        client.end()
+        console.log "-".repeat(120)
+        console.log ""
         that.finish()
-
-
 
 
     else
@@ -159,8 +143,8 @@ class PgForwardMigration
   # Check the migrations table, create if it doesn't exist, then enqueue migrations
   start: ()->
     that = @
-    client = new @client(@config.database)
-    client.connect()
+    
+    # 
     console.log chalk.gray("Check Migrations Table")
     migrationSql ="""
       CREATE TABLE IF NOT EXISTS pg_migrations
@@ -180,14 +164,12 @@ class PgForwardMigration
 
     """
     console.log chalk.gray("Ensuring that pg_migrations table exists.")
-    client.query(migrationSql)
-    .then (result) ->
-      client.end()
+    try
+      result = await result = await @client.query(migrationSql)
       that.enqueue()
-    .catch (err)->
+    catch err
       console.log chalk.red("Error trying to check the pg_migrations table exists")
       console.log err
-      client.end()
       that.finish()
 
   migrate: ()->
@@ -195,6 +177,7 @@ class PgForwardMigration
     @start()
 
   finish: ()->
+    @client.end()
     console.log chalk.white("Task finished. #{@completed_migrations.length} migrations were executed.")
 
 

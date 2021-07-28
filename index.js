@@ -17,13 +17,13 @@ PgForwardMigration = (function() {
     constructor(config) {
       var pg;
       pg = require('pg');
-      this.client = pg.Client;
+      this.client = new pg.Pool(config.database);
       this.config = config;
     }
 
     // build the queue
-    enqueue() {
-      var client, klawSync, migrationFilter, migrationPaths, scannedFiles, sql, that;
+    async enqueue() {
+      var err, klawSync, migrationFilter, migrationPaths, result, scannedFiles, sql, that;
       that = this;
       // populate file_migrations array
       klawSync = require('klaw-sync');
@@ -61,13 +61,10 @@ PgForwardMigration = (function() {
       });
       // populate executed_migrations array from db
       console.log(chalk.gray("Checking for completed migrations"));
-      that = this;
-      client = new this.client(this.config.database);
-      client.connect();
       sql = "select * from pg_migrations order by id asc";
-      return client.query(sql).then(function(result) {
+      try {
+        result = (await this.client.query(sql));
         that.executed_migrations = result.rows;
-        client.end();
         console.log(chalk.gray("Cleaning up executed migrations from queue..."));
         that.executed_migrations.forEach(function(executed_migration) {
           return that.queued_migrations.remove(function(file_migration) {
@@ -82,76 +79,70 @@ PgForwardMigration = (function() {
         });
         console.log(`${that.queued_migrations.length} migrations outstanding.`);
         return that.nextInQueue();
-      }).catch(function(err) {
+      } catch (error) {
+        err = error;
         console.log(chalk.red("Error while retrieving executed migrations"));
         console.log(err);
-        client.end();
         return that.finish();
-      });
+      }
     }
 
-    nextInQueue(rootScope) {
-      var client, currentMigration, logSql, migrationSql, that;
+    async nextInQueue(rootScope) {
+      var currentMigration, err, innerErr, logSql, migrationSql, result, that;
       that = this;
       logSql = "insert into pg_migrations (version_tag,description,script_path,script_filename,script_md5, executed_by,executed_at,execution_duration, success) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) ";
       if (this.queued_migrations.length > 0) {
         currentMigration = this.queued_migrations.shift();
         migrationSql = fs.readFileSync(currentMigration.script_path).toString();
-        client = new this.client(this.config.database);
-        client.connect();
-        //console.log sql
         currentMigration.executed_at = Date.create();
-        return client.query(migrationSql).then(function(result) {
-          // migration completed
+        try {
+          result = (await this.client.query(migrationSql));
           currentMigration.execution_duration = currentMigration.executed_at.millisecondsAgo();
           currentMigration.success = 1;
           that.completed_migrations.push(currentMigration);
           console.info(chalk.green(`Migrating: ${currentMigration.script_filename}`));
-          client.end();
-          // log migration
-          client = new that.client(that.config.database);
-          client.connect();
-          return client.query(logSql, Object.values(currentMigration)).then(function(result) {
-            //console.info "Logged migration #{currentMigration.version_tag}"
-            client.end();
+          try {
+            // log migration
+            result = (await this.client.query(logSql, Object.values(currentMigration)));
             return that.nextInQueue();
-          }).catch(function(err) {
-            if (err != null) {
-              console.error(chalk.red("Error trying to record migration into pg_migrations"));
-              console.error(err);
-              client.end();
-              return that.finish();
-            }
-          });
-        }).catch(function(err) {
+          } catch (error) {
+            innerErr = error;
+            console.error(chalk.red("Error trying to record migration into pg_migrations"));
+            console.error(innerErr);
+            return that.finish();
+          }
+        } catch (error) {
+          err = error;
           console.error(chalk.red(`Error trying to migrate ${currentMigration.script_filename}`));
+          console.log("-".repeat(120));
+          console.error("Trace:");
           console.error(err);
-          client.end();
+          console.log("-".repeat(120));
+          console.log("");
           return that.finish();
-        });
+        }
       } else {
         return that.finish();
       }
     }
 
     // Check the migrations table, create if it doesn't exist, then enqueue migrations
-    start() {
-      var client, migrationSql, that;
+    async start() {
+      var err, migrationSql, result, that;
       that = this;
-      client = new this.client(this.config.database);
-      client.connect();
+      
       console.log(chalk.gray("Check Migrations Table"));
       migrationSql = "CREATE TABLE IF NOT EXISTS pg_migrations\n(\n  id bigserial,\n  version_tag character varying(10) not null,\n  description character varying(256) not null,\n  script_path character varying(1024) not null,\n  script_filename character varying(256) not null,\n  script_md5 varchar(256) not null,\n  executed_by character varying(100) not null,\n  executed_at timestamp without time zone NOT NULL DEFAULT now(),\n  execution_duration integer not null,\n  success smallint not null,\n  CONSTRAINT pg_migrations_pkey PRIMARY KEY (id)\n);\n";
       console.log(chalk.gray("Ensuring that pg_migrations table exists."));
-      return client.query(migrationSql).then(function(result) {
-        client.end();
+      try {
+        result = (await (result = (await this.client.query(migrationSql))));
         return that.enqueue();
-      }).catch(function(err) {
+      } catch (error) {
+        err = error;
         console.log(chalk.red("Error trying to check the pg_migrations table exists"));
         console.log(err);
-        client.end();
         return that.finish();
-      });
+      }
     }
 
     migrate() {
@@ -160,6 +151,7 @@ PgForwardMigration = (function() {
     }
 
     finish() {
+      this.client.end();
       return console.log(chalk.white(`Task finished. ${this.completed_migrations.length} migrations were executed.`));
     }
 
