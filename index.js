@@ -1,4 +1,4 @@
-var PgForwardMigration, Sugar, chalk, fs, hasha, path;
+var PgForwardMigration, Sugar, chalk, fs, hasha, klawSync, path, pg;
 
 Sugar = require("sugar");
 
@@ -12,21 +12,22 @@ fs = require("fs-extra");
 
 chalk = require("chalk");
 
+klawSync = require('klaw-sync');
+
+pg = require('pg');
+
 PgForwardMigration = (function() {
   class PgForwardMigration {
     constructor(config) {
-      var pg;
-      pg = require('pg');
       this.client = new pg.Pool(config.database);
       this.config = config;
     }
 
     // build the queue
     async enqueue() {
-      var err, klawSync, migrationFilter, migrationPaths, result, scannedFiles, sql, that;
+      var err, migrationFilter, migrationPaths, result, scannedFiles, sql, that;
       that = this;
       // populate file_migrations array
-      klawSync = require('klaw-sync');
       migrationFilter = function(item) {
         return item.path.endsWith(".sql") && item.path.includes("__");
       };

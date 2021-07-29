@@ -4,7 +4,8 @@ path = require "path"
 hasha = require "hasha"
 fs = require "fs-extra"
 chalk = require "chalk"
-
+klawSync = require('klaw-sync')
+pg = require('pg')
 
 class PgForwardMigration
 
@@ -16,7 +17,7 @@ class PgForwardMigration
   completed_migrations: [] # populated with freshly executed migrations
 
   constructor: (config)->
-    pg = require('pg')
+    
     @client = new pg.Pool(config.database)
     @config = config
 
@@ -27,7 +28,7 @@ class PgForwardMigration
 
     # populate file_migrations array
 
-    klawSync = require('klaw-sync')
+    
 
     migrationFilter = (item)->
       item.path.endsWith(".sql") && item.path.includes("__")
