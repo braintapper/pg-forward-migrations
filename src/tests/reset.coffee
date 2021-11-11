@@ -10,8 +10,8 @@ console.log chalk.yellow("Reset database")
 
 
 
-config = fs.readJsonSync("./testconfig.json")
-resetSql = fs.readFileSync("./testmigrations/reset.sql").toString()
+config = fs.readJsonSync("./config.json")
+resetSql = fs.readFileSync("../testmigrations/reset.sql").toString()
 
 
 client = new pg.Client(config.database)

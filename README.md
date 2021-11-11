@@ -29,7 +29,7 @@ var PgForwardMigration, config, migrationJob;
 PgForwardMigration = require("pg-forward-migrations");
 
 config = {
-  "migrationPath": "./testmigrations", // folder containing migration files
+  "migration_path": "./testmigrations", // folder containing migration files
   "database": {
     "host": "192.168.1.10",
     "database": "migration_test",

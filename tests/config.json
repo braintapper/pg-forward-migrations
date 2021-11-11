@@ -1,5 +1,5 @@
 {
-  "migrationPath": "./testmigrations",
+  "migration_path": "../testmigrations",
   "database": {
     "host": "192.168.1.90",
     "database": "migration_test",
