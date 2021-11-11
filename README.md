@@ -59,7 +59,7 @@ In the migrations folder:
 
 ## Naming Convention for SQL Files
 
-0001__Description_Here.sql
+`0001__Description_Here.sql`
 
 The first part "0001" is the version tag. This part can be up to 10 characters, ideally a zero padded number. Migration files are loaded in ascending order. Sorting may be unpredictable if you don't stick to a zero padded number. Each file should be a consecutive number, with no gaps.
 
