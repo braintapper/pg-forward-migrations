@@ -23,7 +23,6 @@ class PgForwardMigration
   initialize_migrations_table: ()->
 
     that = @
-    console.log chalk.gray("Check Migrations Table")
     migration_sql ="""
       CREATE TABLE IF NOT EXISTS pg_migrations
       (
@@ -44,6 +43,7 @@ class PgForwardMigration
     console.log chalk.gray("Ensuring that pg_migrations table exists.")
     result = await @client.query(migration_sql)
     result
+    
 
   get_executed_migrations: ()->
     sql = "select * from pg_migrations order by id asc"
@@ -57,6 +57,10 @@ class PgForwardMigration
 
   get_migration_files: ()->
     that = @
+    # backwards compatiblity fix
+    if @config.migrationPath? and !@config.migration_path?
+      @config.migration_path = @config.migrationPath
+      
     scannedFiles = klawSync("#{@config.migration_path}" , {nodir: true, filter: @migration_filter}).sortBy (item)->
       return item.path
 
@@ -125,7 +129,7 @@ class PgForwardMigration
       console.log chalk.red("-".repeat(80))
       console.log ""
       throw "Migration terminated due to errors."
-      
+
 
   execute_outstanding_migrations: ()->
     
@@ -133,6 +137,19 @@ class PgForwardMigration
       console.log "Execute outstanding migrations"
       await @run_migration migration for migration in @queued_migrations
 
+
+  outstanding_migrations: ()->
+    console.log chalk.white("PG Forward Migrations - Outstanding")  
+    try
+      await @initialize_migrations_table()
+      await @get_migration_files()
+      await @get_executed_migrations()
+      await @check_completed_migrations()
+      return @queued_migrations.length - @completed_migrations.length
+    catch err
+      console.error chalk.red(err)
+    finally
+      await @client.end()
 
   migrate: ()->
     

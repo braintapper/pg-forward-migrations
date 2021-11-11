@@ -88,4 +88,8 @@ Rollbacks do not and will never exist in this tool.
 
  The goal was not to make a solution for everyone. This was created to satisfy the requirements of my own projects, which are mostly PG.
 
+ I do have an SQLite version of this migration library, which can be found here: https://github.com/braintapper/sqlite-forward-migrations
+
  If you need a cross-database migration tool, there are already "bigger" solutions like Flyway and Liquibase.
+
+

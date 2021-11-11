@@ -26,7 +26,6 @@ PgForwardMigration = (function() {
     async initialize_migrations_table() {
       var migration_sql, result, that;
       that = this;
-      console.log(chalk.gray("Check Migrations Table"));
       migration_sql = "CREATE TABLE IF NOT EXISTS pg_migrations\n(\n  id bigserial,\n  version_tag character varying(10) not null,\n  description character varying(256) not null,\n  script_path character varying(1024) not null,\n  script_filename character varying(256) not null,\n  script_md5 varchar(256) not null,\n  executed_by character varying(100) not null,\n  executed_at timestamp without time zone NOT NULL DEFAULT now(),\n  execution_duration integer not null,\n  success smallint not null,\n  CONSTRAINT pg_migrations_pkey PRIMARY KEY (id)\n);";
       console.log(chalk.gray("Ensuring that pg_migrations table exists."));
       result = (await this.client.query(migration_sql));
@@ -49,6 +48,10 @@ PgForwardMigration = (function() {
     get_migration_files() {
       var migration_paths, scannedFiles, that;
       that = this;
+      // backwards compatiblity fix
+      if ((this.config.migrationPath != null) && (this.config.migration_path == null)) {
+        this.config.migration_path = this.config.migrationPath;
+      }
       scannedFiles = klawSync(`${this.config.migration_path}`, {
         nodir: true,
         filter: this.migration_filter
@@ -142,6 +145,23 @@ PgForwardMigration = (function() {
           results.push((await this.run_migration(migration)));
         }
         return results;
+      }
+    }
+
+    async outstanding_migrations() {
+      var err;
+      console.log(chalk.white("PG Forward Migrations - Outstanding"));
+      try {
+        await this.initialize_migrations_table();
+        await this.get_migration_files();
+        await this.get_executed_migrations();
+        await this.check_completed_migrations();
+        return this.queued_migrations.length - this.completed_migrations.length;
+      } catch (error) {
+        err = error;
+        return console.error(chalk.red(err));
+      } finally {
+        await this.client.end();
       }
     }
 
